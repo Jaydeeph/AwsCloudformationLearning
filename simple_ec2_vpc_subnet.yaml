@@ -1,0 +1,116 @@
+Description: This templace is to create Chef workstation and client instances in its own VPC and subnet. 
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names.
+    Type: String
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC.
+    Type: String
+    Default: 10.192.0.0/16
+
+  PrivateSubnetCIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone.
+    Type: String
+    Default: 10.192.0.0/24
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: The size of the EC2 Virtual Machine.
+
+  EC2Ami:
+    Type: String
+    Default: ami-0057d8e6fb0692b80
+    Description: Allowed Ami's for EC2 Instnace.
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Keyname value for EC2 instance. 
+    ConstraintDescription: Must be a excisting EC2 KeyPair. 
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet
+
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      VpcId: !Ref VPC
+      GroupDescription: Allows SSH connection.
+      GroupName: SSH SG
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+
+  ChefWorkstationInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref EC2Ami
+      KeyName: !Ref KeyPairName
+      NetworkInterfaces:
+      - SubnetId:
+          Ref: PrivateSubnet
+        AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - Ref: SSHSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 10
+      Tags:
+        - Key: Name
+          Value: Workstation
+
+  ChefClientInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref EC2Ami
+      KeyName: !Ref KeyPairName
+      NetworkInterfaces:
+      - SubnetId:
+          Ref: PrivateSubnet
+        AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - Ref: SSHSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 10
+      Tags:
+        - Key: Name
+          Value: Client
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PrivateSubnet:
+    Description: Private subnet
+    Value: !Ref PrivateSubnet
+
+  
